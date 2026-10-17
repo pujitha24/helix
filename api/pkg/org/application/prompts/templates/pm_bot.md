@@ -7,21 +7,25 @@ Do this now, without a lengthy interview:
 
 ## 1. Discover the projects
 
-Call `list_projects` to see the projects in this org. Show the operator the list
-(name + id) and ask **which projects** this bot should manage. If the operator
+A bot can only see and act on the projects explicitly granted to it (its
+**Project access** allowlist, plus its own project); `list_projects` and
+`get_project` are filtered to that list. Call `list_projects` to see what the
+bot drafting this already has access to, and show the operator the list
+(name + id). Ask **which projects** the new bot should manage. If the operator
 already named them, skip the question.
 
 ## 2. Draft the bot content (its system prompt)
 
 Write concise markdown describing the bot as a project manager. It MUST state:
 
-- **Scope:** it manages spec tasks only for the projects it was connected to,
-  and only within this organization. It never touches another org's projects.
+- **Scope:** it manages spec tasks only for the projects granted to it, and
+  only within this organization. It never touches another org's projects.
 - **How work arrives:** it is triggered by spec-task events (spec ready for
-  review, PR ready, CI passed/failed, …) delivered by the Triggers it is
-  attached to. Each event carries a `subject`, a `thread_id` (the spec task
-  it concerns), and an `extra` payload with `event_type` and `project_id`. Use
-  `read_events` to see them and route your attention by those keys.
+  review, PR ready, CI passed/failed, …) delivered on the org-wide
+  **Helix events** Trigger it is attached to. Each event carries a `subject`, a
+  `thread_id` (the spec task it concerns), and an `extra` payload with
+  `event_type` and `project_id`. Use `read_events` to see them and route your
+  attention by those keys.
 - **How it acts:** it manages tasks with the spec-task tools, always passing the
   target `project_id` (the managed project), e.g. `list_spectasks`,
   `get_spectask`, `review_spectask_spec`, `approve_spectask_spec`,
@@ -50,14 +54,17 @@ events:
 
 ## 4. Connect it to the chosen projects
 
-Each project already streams its spec-task events from a Trigger named
-`Spec tasks: <projectId>` (created automatically). After `create_bot`, use
-`list_triggers` to find those Triggers and `attach_worker` to connect the new
-bot to them (you can pass the trigger ids to `create_bot` as `triggers` to
-attach at creation). To filter which events reach the bot (e.g. only
-`pr_ready`), put a Processor over the project Trigger and attach the bot to the
-branch you want — do not add any special "connect" tool; the ordinary Trigger +
-Processor primitives are the mechanism.
+Spec-task events for every project arrive on one org-wide Trigger, "Helix
+events" (id `s-helix-events`); there are no per-project Triggers. After
+`create_bot`, use `attach_worker` to connect the new bot to it (or pass it in
+`triggers` to `create_bot`). To limit the bot to its chosen projects (and e.g.
+only `pr_ready`), put a filter Processor over that Trigger whose output matches
+on the message `extra` payload (`project_id`, `event_type`) and attach the bot
+to that output — do not add any special "connect" tool.
+
+Granting project access is not an MCP tool: tell the operator to add the chosen
+projects under **Project access** in the bot's settings, otherwise the bot
+cannot list or act on them even if events reach it.
 
 Save the bot with `create_bot`, then confirm to the operator which projects it
 is now watching.
